@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>أساطير الهروب - النسخة الموسيقية الداخلية</title>
+    <style>
+        :root {
+            --bg: #020617; --panel: #0f172a; --accent: #3b82f6;
+            --player: #10b981; --enemy: #ef4444; --coin: #fbbf24;
+        }
+
+        body {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100vh; margin: 0; background: var(--bg); font-family: 'Cairo', sans-serif;
+            color: white; overflow: hidden; touch-action: none; transition: background 0.5s;
+        }
+
+        .confetti {
+            position: absolute; width: 10px; height: 10px; z-index: 100;
+            animation: fall 3s linear forwards;
+        }
+        @keyframes fall { to { transform: translateY(100vh) rotate(360deg); opacity: 0; } }
+
+        #game-board {
+            width: 320px; height: 320px; background: rgba(30, 41, 59, 0.3);
+            border: 3px solid #334155; position: relative; border-radius: 20px;
+            display: none; overflow: hidden;
+        }
+
+        #player { 
+            width: 28px; height: 28px; background: var(--player); position: absolute; 
+            border-radius: 8px; z-index: 10; display: flex; align-items: center; 
+            justify-content: center; font-size: 18px; box-shadow: 0 0 15px var(--player);
+        }
+
+        #enemy { 
+            width: 34px; height: 34px; position: absolute; border-radius: 50%; 
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; transition: transform 0.1s; z-index: 11;
+        }
+
+        #coin { width: 20px; height: 20px; background: var(--coin); position: absolute; border-radius: 50%; box-shadow: 0 0 15px var(--coin); border: 2px solid #fff; }
+
+        .ui-screen {
+            display: flex; flex-direction: column; align-items: center;
+            background: var(--panel); padding: 20px; border-radius: 25px;
+            width: 300px; border: 1px solid #1e293b; position: relative;
+        }
+
+        .scroll-area { width: 100%; max-height: 250px; overflow-y: auto; margin: 10px 0; }
+        .item-card {
+            background: #1e293b; padding: 10px; margin-bottom: 8px; border-radius: 12px;
+            display: flex; justify-content: space-between; align-items: center; font-size: 14px;
+        }
+
+        .gold-display { font-size: 24px; color: var(--coin); margin: 5px 0; font-weight: bold; }
+        button { background: var(--accent); border: none; color: white; padding: 10px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; transition: 0.2s; }
+        button:disabled { background: #334155; opacity: 0.7; }
+
+        .controls { display: grid; grid-template-columns: repeat(3, 60px); gap: 10px; margin-top: 15px; }
+        .joy-btn {
+            width: 60px; height: 60px; background: #1e293b; border: 1px solid #475569;
+            border-radius: 15px; display: flex; align-items: center; justify-content: center; font-size: 22px;
+            color: #94a3b8; touch-action: none;
+        }
+        .joy-btn:active { background: var(--accent); color: white; }
+    </style>
+</head>
+<body>
+
+    <div id="main-menu" class="ui-screen">
+        <h2 style="color:var(--accent); margin:0;">أساطير الهروب</h2>
+        <div class="gold-display">💰 <span id="gold-balance">0</span></div>
+        <button id="daily-btn" onclick="claimDaily()" style="background:#f59e0b;">🎁 هدية يومية (+50)</button>
+        <button onclick="startGame()" style="background:#10b981; margin-top:10px;">بدء المغامرة ⚡</button>
+        <button onclick="openShop()" style="margin-top:10px;">المتجر الضخم 🛒</button>
+    </div>
+
+    <div id="shop-screen" class="ui-screen" style="display:none">
+        <h3>المتجر 🛒</h3>
+        <div class="scroll-area" id="shop-list"></div>
+        <button onclick="closeShop()" style="background:#ef4444;">رجوع</button>
+    </div>
+
+    <div id="game-container" style="display:none">
+        <div style="width:320px; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <span style="color:var(--coin); font-weight:bold;">💰 <span id="ingame-money">0</span></span>
+            <span id="power-ui"></span>
+            <span id="lvl-badge" style="background:var(--accent); padding:2px 10px; border-radius:15px; font-size:12px;">LEVEL 1</span>
+        </div>
+        <div id="game-board">
+            <div id="player">🟦</div>
+            <div id="enemy">👹</div>
+            <div id="coin"></div>
+        </div>
+        <div class="controls">
+            <div class="joy-btn" style="grid-column:2" onpointerdown="keys.up=true" onpointerup="keys.up=false">▲</div>
+            <div class="joy-btn" style="grid-column:1" onpointerdown="keys.left=true" onpointerup="keys.left=false">◀</div>
+            <div class="joy-btn" style="grid-column:3" onpointerdown="keys.right=true" onpointerup="keys.right=false">▶</div>
+            <div class="joy-btn" style="grid-column:2" onpointerdown="keys.down=true" onpointerup="keys.down=false">▼</div>
+        </div>
+    </div>
+
+<script>
+    // --- نظام الصوت والموسيقى الداخلية ---
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx;
+    let musicInterval;
+
+    function initAudio() {
+        if (!audioCtx) audioCtx = new AudioCtx();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function playNote(freq, dur, vol, type='triangle') {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + dur);
+    }
+
+    function startInternalMusic() {
+        if (musicInterval) clearInterval(musicInterval);
+        let step = 0;
+        musicInterval = setInterval(() => {
+            if (!active) return;
+            // إيقاع حماسي يتغير مع الليفل
+            if (step % 4 === 0) playNote(60, 0.4, 0.15, 'triangle'); // Bass
+            if (step % 4 === 2) playNote(120, 0.1, 0.05, 'square'); // Snare-like
+            if (step % 8 === 7) playNote(220, 0.2, 0.03, 'sine'); // Melody
+            step++;
+        }, Math.max(150, 250 - (level * 5)));
+    }
+
+    // --- وظائف اللعبة الأساسية ---
+    function celebrate() {
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+        for (let i = 0; i < 30; i++) {
+            const c = document.createElement('div');
+            c.className = 'confetti';
+            c.style.left = Math.random() * 100 + 'vw';
+            c.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 50%)`;
+            document.body.appendChild(c);
+            setTimeout(() => c.remove(), 3000);
+        }
+    }
+
+    let db = {
+        gold: parseInt(localStorage.getItem('gold_save')) || 0,
+        lastDaily: parseInt(localStorage.getItem('daily_save')) || 0,
+        unlockedSkins: JSON.parse(localStorage.getItem('skins_save')) || ['🟦'],
+        activeSkin: '🟦', shield: 0, magnet: false, speedBonus: 0
+    };
+
+    let keys = { up: false, down: false, left: false, right: false };
+    let px, py, ex, ey, cx, cy, score = 0, level = 1, active = false;
+    const monsterSkins = ["👹", "💀", "👾", "👽", "👺", "👻", "🧟", "🐲", "🧛", "🦁"];
+    const levelColors = ["#020617", "#1e1b4b", "#312e81", "#4c1d95", "#581c87", "#701a75", "#831843", "#991b1b", "#7c2d12", "#064e3b"];
+
+    function save() {
+        localStorage.setItem('gold_save', db.gold);
+        localStorage.setItem('daily_save', db.lastDaily);
+        localStorage.setItem('skins_save', JSON.stringify(db.unlockedSkins));
+        document.getElementById('gold-balance').innerText = db.gold;
+        checkDaily();
+    }
+
+    function checkDaily() {
+        let btn = document.getElementById('daily-btn');
+        if (Date.now() - db.lastDaily < 86400000) { 
+            btn.disabled = true; btn.innerText = "تم استلام الهدية ✅"; 
+        } else {
+            btn.disabled = false; btn.innerText = "🎁 هدية يومية (+50)";
+        }
+    }
+
+    function claimDaily() {
+        if (Date.now() - db.lastDaily >= 86400000) { 
+            db.gold += 50; db.lastDaily = Date.now(); save(); celebrate();
+            alert("مبروك! ارجع غدا وخد هديتك"); 
+        } else { alert("ارجع غدا وخد هديتك"); }
+    }
+
+    const shopItems = [
+        { id: 'shield', name: 'درع طاقة 🛡️', price: 60, type: 'tool' },
+        { id: 'magnet', name: 'مغناطيس 🧲', price: 150, type: 'tool' },
+        { id: 'boots', name: 'حذاء سرعة ⚡', price: 200, type: 'tool' },
+        { id: 'skin_ninja', name: 'نينجا 🥷', price: 250, type: 'skin', val: '🥷' },
+        { id: 'skin_robot', name: 'روبوت 🤖', price: 400, type: 'skin', val: '🤖' },
+        { id: 'skin_ghost', name: 'شبح 👻', price: 500, type: 'skin', val: '👻' },
+        { id: 'skin_alien', name: 'فضائي 👽', price: 700, type: 'skin', val: '👽' },
+        { id: 'skin_dragon', name: 'تنين 🐲', price: 1000, type: 'skin', val: '🐲' },
+        { id: 'skin_king', name: 'الملك 👑', price: 2000, type: 'skin', val: '👑' },
+        { id: 'skin_hero', name: 'بطل 🦸', price: 3000, type: 'skin', val: '🦸' }
+    ];
+
+    function openShop() { document.getElementById('main-menu').style.display = 'none'; document.getElementById('shop-screen').style.display = 'flex'; renderShop(); }
+    function closeShop() { document.getElementById('shop-screen').style.display = 'none'; document.getElementById('main-menu').style.display = 'flex'; }
+    function renderShop() {
+        let html = '';
+        shopItems.forEach(item => {
+            let owned = item.type === 'skin' && db.unlockedSkins.includes(item.val);
+            html += `<div class="item-card"><span>${item.name}</span><button onclick="buy('${item.id}', ${item.price}, '${item.val||''}', '${item.type}')">${owned ? (db.activeSkin === item.val ? 'مجهز' : 'تجهيز') : item.price + '💰'}</button></div>`;
+        });
+        document.getElementById('shop-list').innerHTML = html;
+    }
+
+    function buy(id, price, val, type) {
+        if (type === 'skin' && db.unlockedSkins.includes(val)) { db.activeSkin = val; renderShop(); return; }
+        if (db.gold >= price) {
+            db.gold -= price;
+            if (type === 'skin') db.unlockedSkins.push(val);
+            else if (id === 'shield') db.shield++;
+            else if (id === 'magnet') db.magnet = true;
+            save(); renderShop(); celebrate(); playNote(600, 0.1, 0.1);
+        } else { alert("الذهب ناقص!"); }
+    }
+
+    function startGame() {
+        initAudio();
+        document.getElementById('main-menu').style.display = 'none';
+        document.getElementById('game-container').style.display = 'block';
+        document.getElementById('game-board').style.display = 'block';
+        document.getElementById('player').innerText = db.activeSkin;
+        px = 145; py = 200; ex = 20; ey = 20; score = 0; level = 1; active = true;
+        updateLevel(); spawnCoin(); startInternalMusic(); loop();
+    }
+
+    function updateLevel() {
+        document.body.style.background = levelColors[(level - 1) % levelColors.length];
+        document.getElementById('lvl-badge').innerText = "LEVEL " + level;
+        document.getElementById('enemy').innerText = monsterSkins[(level - 1) % monsterSkins.length];
+    }
+
+    function spawnCoin() { cx = Math.random() * 290; cy = Math.random() * 290; document.getElementById('coin').style.left = cx + 'px'; document.getElementById('coin').style.top = cy + 'px'; }
+
+    function loop() {
+        if (!active) return;
+        let s = 5 + (level * 0.4);
+        if (keys.up && py > 0) py -= s; if (keys.down && py < 290) py += s; if (keys.left && px > 0) px -= s; if (keys.right && px < 290) px += s;
+        ex += (px - ex) * (0.007 + (level * 0.005)); ey += (py - ey) * (0.007 + (level * 0.005));
+        let a = Math.atan2(py - ey, px - ex) * (180 / Math.PI); document.getElementById('enemy').style.transform = `rotate(${a + 90}deg)`;
+        if (db.magnet && Math.hypot(px-cx, py-cy) < 100) { cx += (px-cx)*0.15; cy += (py-cy)*0.15; }
+        document.getElementById('player').style.left = px + 'px'; document.getElementById('player').style.top = py + 'px';
+        document.getElementById('enemy').style.left = ex + 'px'; document.getElementById('enemy').style.top = ey + 'px';
+        document.getElementById('coin').style.left = cx + 'px'; document.getElementById('coin').style.top = cy + 'px';
+        
+        if (Math.abs(px - cx) < 25 && Math.abs(py - cy) < 25) {
+            score++; db.gold++; playNote(800, 0.05, 0.1);
+            document.getElementById('ingame-money').innerText = score;
+            if (score % 5 === 0) { level++; playNote(1000, 0.2, 0.15); updateLevel(); startInternalMusic(); }
+            save(); spawnCoin();
+        }
+        if (Math.abs(px - ex) < 22 && Math.abs(py - ey) < 22) {
+            if (db.shield > 0) { db.shield--; ex = 0; ey = 0; updateLevel(); playNote(200, 0.3, 0.2, 'sawtooth'); alert("🛡️ الدرع حماك!"); }
+            else { active = false; playNote(100, 0.5, 0.3, 'sawtooth'); alert("Game Over! ارجع غدا وخد هديتك"); location.reload(); }
+        }
+        if (active) requestAnimationFrame(loop);
+    }
+    document.getElementById('gold-balance').innerText = db.gold;
+    checkDaily();
+</script>
+</body>
+</html>
