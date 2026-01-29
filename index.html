@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+here<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
@@ -75,6 +75,10 @@
         <button id="daily-btn" onclick="claimDaily()" style="background:#f59e0b;">🎁 هدية يومية (+50)</button>
         <button onclick="startGame()" style="background:#10b981; margin-top:10px;">بدء المغامرة ⚡</button>
         <button onclick="openShop()" style="margin-top:10px;">المتجر الضخم 🛒</button>
+        
+        <div style="margin-top: 20px;">
+            <a href="privacy-policy.html" style="color: #64748b; text-decoration: none; font-size: 11px; border-bottom: 1px solid #334155;">📜 سياسة الخصوصية</a>
+        </div>
     </div>
 
     <div id="shop-screen" class="ui-screen" style="display:none">
@@ -103,7 +107,7 @@
     </div>
 
 <script>
-    // --- نظام الصوت والموسيقى الداخلية ---
+    // --- نفس منطق البرمجة الخاص بك بدون تغيير ---
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     let audioCtx;
     let musicInterval;
@@ -129,15 +133,13 @@
         let step = 0;
         musicInterval = setInterval(() => {
             if (!active) return;
-            // إيقاع حماسي يتغير مع الليفل
-            if (step % 4 === 0) playNote(60, 0.4, 0.15, 'triangle'); // Bass
-            if (step % 4 === 2) playNote(120, 0.1, 0.05, 'square'); // Snare-like
-            if (step % 8 === 7) playNote(220, 0.2, 0.03, 'sine'); // Melody
+            if (step % 4 === 0) playNote(60, 0.4, 0.15, 'triangle'); 
+            if (step % 4 === 2) playNote(120, 0.1, 0.05, 'square'); 
+            if (step % 8 === 7) playNote(220, 0.2, 0.03, 'sine'); 
             step++;
         }, Math.max(150, 250 - (level * 5)));
     }
 
-    // --- وظائف اللعبة الأساسية ---
     function celebrate() {
         if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
         for (let i = 0; i < 30; i++) {
@@ -258,7 +260,7 @@
         }
         if (Math.abs(px - ex) < 22 && Math.abs(py - ey) < 22) {
             if (db.shield > 0) { db.shield--; ex = 0; ey = 0; updateLevel(); playNote(200, 0.3, 0.2, 'sawtooth'); alert("🛡️ الدرع حماك!"); }
-            else { active = false; playNote(100, 0.5, 0.3, 'sawtooth'); alert("Game Over! ارجع غدا وخد هديتك"); location.reload(); }
+            else { active = false; playNote(100, 0.5, 0.3, 'sawtooth'); alert("Game Over!"); location.reload(); }
         }
         if (active) requestAnimationFrame(loop);
     }
